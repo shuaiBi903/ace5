@@ -88,13 +88,15 @@ jobs:
         
     - name: 上传构建产物
       if: success()
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4  # 从 v3 升级到 v4
       with:
         name: kernel-artifacts
         path: |
           work/out/dist/boot.img
-          AnyKernel3-KSU-next.zip
+          AnyKernel3-KSU.zip
         if-no-files-found: error
+        compression-level: 9  # v4 新增的压缩级别选项
+        retention-days: 5     # v4 新增的保留天数选项
 
     - name: 清理工作空间
       if: always()
