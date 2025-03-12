@@ -31,22 +31,23 @@ jobs:
         
     - name: 设置 repo 工具
       run: |
-        mkdir -p ~/bin
-        curl https://storage.googleapis.com/git-repo-downloads/repo > ~/bin/repo
-        chmod a+x ~/bin/repo
-        echo 'export PATH=~/bin:$PATH' >> ~/.bashrc
-        source ~/.bashrc
+        sudo apt-get install -y repo
+        repo --version
         
     - name: 配置 Git
       run: |
         git config --global user.email "github-actions@github.com"
         git config --global user.name "GitHub Actions"
-        
+
     - name: 创建工作目录并初始化源码
       run: |
-        mkdir work && cd work
+        mkdir work
+        cd work
         repo init -u https://github.com/OnePlusOSS/kernel_manifest.git -b oneplus/sm8650 --depth=1 -m oneplus_ace5.xml
         
+  
+        
+         
     - name: 同步源码
       run: |
         cd work
