@@ -1,0 +1,74 @@
+name: Build Kernel
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: 安装依赖
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y python-is-python3 git curl
+        
+    - name: 设置 repo 工具
+      run: |
+        mkdir -p ~/bin
+        curl https://storage.googleapis.com/git-repo-downloads/repo > ~/bin/repo
+        chmod a+x ~/bin/repo
+        echo 'export PATH=~/bin:$PATH' >> ~/.bashrc
+        source ~/.bashrc
+        
+    - name: 配置 Git
+      run: |
+        git config --global user.email "github-actions@github.com"
+        git config --global user.name "GitHub Actions"
+        
+    - name: 创建工作目录并初始化源码
+      run: |
+        mkdir work && cd work
+        repo init -u https://github.com/OnePlusOSS/kernel_manifest.git -b oneplus/sm8650 --depth=1 -m oneplus_ace5.xml
+        
+    - name: 同步源码
+      run: |
+        cd work
+        repo sync --force-sync -c -j$(nproc --all)
+        
+    - name: 下载和配置 SUSFS
+      run: |
+        cd work
+        git clone https://gitlab.com/simonpunk/susfs4ksu.git -b gki-android14-6.1 --depth=1 susfs
+        cd kernel_platform
+        rm -rf ./common/android/abi_gki_protected_exports_*
+        export KERNEL_REPO=$(pwd)
+        cd common/
+        curl -LSs "https://raw.githubusercontent.com/rifsxd/KernelSU-Next/next-susfs/kernel/setup.sh" | bash -s next-susfs
+        
+    - name: 应用 SUSFS 补丁
+      run: |
+        cd work
+        cd susfs/
+        cp ./kernel_patches/50_add_susfs_in_gki-android14-6.1.patch $KERNEL_REPO/common/
+        cp ./kernel_patches/fs/* $KERNEL_REPO/common/fs/
+        cp ./kernel_patches/include/linux/* $KERNEL_REPO/common/include/linux/
+        cd $KERNEL_REPO/common
+        patch -p1 < 50_add_susfs_in_gki-android14-6.1.patch
+        
+    - name: 编译内核
+      run: |
+        cd work
+        ./kernel_platform/oplus/build/oplus_build_kernel.sh pineapple gki
+        
+    - name: 上传编译结果
+      uses: actions/upload-artifact@v3
+      with:
+        name: kernel-build
+        path: work/out/dist/boot.img
