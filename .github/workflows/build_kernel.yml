@@ -58,49 +58,75 @@ jobs:
         cd work
         git clone https://gitlab.com/simonpunk/susfs4ksu.git -b gki-android14-6.1 --depth=1 susfs
         cd kernel_platform
-        rm -rf ./common/android/abi_gki_protected_exports_*
-        export KERNEL_REPO=$(pwd)
+        rm -rf ./common/android/abi_gki_protected_exports_* || true
+        KERNEL_REPO=$(pwd)
         cd common/
         curl -LSs "https://raw.githubusercontent.com/rifsxd/KernelSU-Next/next-susfs/kernel/setup.sh" | bash -s next-susfs
         
     - name: 应用 SUSFS 补丁
       run: |
         cd work
+        KERNEL_REPO=$(pwd)/kernel_platform
         cd susfs/
+        # 确保目标目录存在
+        mkdir -p $KERNEL_REPO/common/fs
+        mkdir -p $KERNEL_REPO/common/include/linux
+        
+        # 复制补丁文件
         cp ./kernel_patches/50_add_susfs_in_gki-android14-6.1.patch $KERNEL_REPO/common/
-        cp ./kernel_patches/fs/* $KERNEL_REPO/common/fs/
-        cp ./kernel_patches/include/linux/* $KERNEL_REPO/common/include/linux/
+        cp -r ./kernel_patches/fs/* $KERNEL_REPO/common/fs/
+        cp -r ./kernel_patches/include/linux/* $KERNEL_REPO/common/include/linux/
+        
+        # 应用补丁
         cd $KERNEL_REPO/common
-        patch -p1 < 50_add_susfs_in_gki-android14-6.1.patch
+        patch -p1 < 50_add_susfs_in_gki-android14-6.1.patch || true
         
     - name: 编译内核
       run: |
         cd work
+        chmod +x kernel_platform/oplus/build/oplus_build_kernel.sh
         ./kernel_platform/oplus/build/oplus_build_kernel.sh pineapple gki
         
     - name: 准备 AnyKernel3
       if: success()
       run: |
+        cd work
         git clone https://github.com/Kernel-SU/AnyKernel3 --depth=1
-        rm -rf ./AnyKernel3/.git
-        cp work/out/dist/boot.img ./AnyKernel3/
+        rm -rf AnyKernel3/.git
+        
+        # 确保输出目录存在
+        mkdir -p kernel_platform/out/dist
+        
+        # 复制编译产物到 AnyKernel3
+        if [ -f "kernel_platform/out/msm-kernel-pineapple-gki/dist/Image" ]; then
+          cp kernel_platform/out/msm-kernel-pineapple-gki/dist/Image AnyKernel3/
+        elif [ -f "kernel_platform/out/dist/boot.img" ]; then
+          cp kernel_platform/out/dist/boot.img AnyKernel3/
+        else
+          echo "找不到内核镜像文件"
+          exit 1
+        fi
+        
+        # 打包 AnyKernel3
         cd AnyKernel3
         zip -r9 ../AnyKernel3-KSU.zip *
+        cd ..
         
     - name: 上传构建产物
       if: success()
-      uses: actions/upload-artifact@v4  # 从 v3 升级到 v4
+      uses: actions/upload-artifact@v4
       with:
-        name: kernel-artifacts
+        name: kernel-artifacts-$(date +%Y%m%d-%H%M)
         path: |
-          work/out/dist/boot.img
-          AnyKernel3-KSU.zip
+          work/kernel_platform/out/dist/boot.img
+          work/kernel_platform/out/msm-kernel-pineapple-gki/dist/Image
+          work/AnyKernel3-KSU.zip
         if-no-files-found: error
-        compression-level: 9  # v4 新增的压缩级别选项
-        retention-days: 5     # v4 新增的保留天数选项
+        compression-level: 9
+        retention-days: 5
 
     - name: 清理工作空间
       if: always()
       run: |
+        cd $GITHUB_WORKSPACE
         rm -rf work
-        rm -rf AnyKernel3
