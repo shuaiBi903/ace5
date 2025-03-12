@@ -72,3 +72,27 @@ jobs:
       with:
         name: kernel-build
         path: work/out/dist/boot.img
+    # ... 前面的配置保持不变 ...
+
+    - name: 编译内核
+      run: |
+        cd work
+        ./kernel_platform/oplus/build/oplus_build_kernel.sh pineapple gki
+        
+    - name: 准备 AnyKernel3
+      run: |
+        git clone https://github.com/Kernel-SU/AnyKernel3 --depth=1
+        rm -rf ./AnyKernel3/.git
+        cp work/out/dist/boot.img ./AnyKernel3/
+        
+    - name: 上传 boot.img
+      uses: actions/upload-artifact@v3
+      with:
+        name: kernel-boot-img
+        path: work/out/dist/boot.img
+        
+    - name: 上传 AnyKernel3 包
+      uses: actions/upload-artifact@v3
+      with:
+        name: kernel-AnyKernel3
+        path: ./AnyKernel3/*
