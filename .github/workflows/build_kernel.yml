@@ -93,7 +93,7 @@ jobs:
         name: kernel-artifacts
         path: |
           work/out/dist/boot.img
-          AnyKernel3-KSU.zip
+          AnyKernel3-KSU-next.zip
         if-no-files-found: error
 
     - name: 清理工作空间
